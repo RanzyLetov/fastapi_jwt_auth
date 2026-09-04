@@ -7,4 +7,5 @@ class Settings(BaseSettings):
     ALGORITHM = "HS256"
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding=".env")
+    
 settings = Settings()
