@@ -5,7 +5,7 @@ from datetime import datetime, timedelta, timezone
 from app.core.config import settings
 from app.schemas.token import TokenData
 
-def heah_password(password: str) -> str:
+def hash_password(password: str) -> str:
     return bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
 
 def verify_password(password: str, hashed_password: str) -> bool:
