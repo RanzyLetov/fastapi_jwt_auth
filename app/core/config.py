@@ -5,8 +5,7 @@ from typing import Any
 class Settings(BaseSettings):
     ALGORITHM: str = "HS256"
 
-    ACCESS_KEY: str = "default_access_fallback_secret"
-    REFRESH_KEY: str = "default_refresh_fallback_secret"
+    SECRET_KEY: str = "default_access_fallback_secret"
 
     CORS_ORIGINS: Any = ["http://localhost:3000"] 
 

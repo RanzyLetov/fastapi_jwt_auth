@@ -24,7 +24,7 @@ def create_access_token(user_id: str) -> str:
         type="access",
     ).model_dump()
 
-    return jwt.encode(payload, settings.ACCESS_KEY, algorithm=settings.ALGORITHM)
+    return jwt.encode(payload, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
 
 def create_refresh_token(user_id: str) -> str:
     time = datetime.now(timezone.utc)
@@ -36,4 +36,4 @@ def create_refresh_token(user_id: str) -> str:
         type="refresh"
     ).model_dump()
 
-    return jwt.encode(payload, settings.REFRESH_KEY, algorithm=settings.ALGORITHM)
+    return jwt.encode(payload, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
