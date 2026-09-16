@@ -21,6 +21,7 @@ def create_access_token(user_id: str) -> str:
         sub=user_id,
         exp=time + timedelta(minutes=15),
         iat=time,
+        type="access",
     ).model_dump()
 
     return jwt.encode(payload, settings.ACCESS_KEY, algorithm=settings.ALGORITHM)
@@ -32,6 +33,7 @@ def create_refresh_token(user_id: str) -> str:
         sub=user_id,
         exp=time + timedelta(days=30),
         iat=time,
+        type="refresh"
     ).model_dump()
 
     return jwt.encode(payload, settings.REFRESH_KEY, algorithm=settings.ALGORITHM)

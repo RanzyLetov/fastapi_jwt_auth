@@ -5,3 +5,4 @@ class TokenData(BaseModel):
     sub: str
     exp: datetime
     iat: datetime
+    type: str
