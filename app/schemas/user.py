@@ -1,5 +1,5 @@
-from pydantic import BaseModel, EmailStr
 from datetime import datetime
+from pydantic import BaseModel, EmailStr
 
 class UserSchema(BaseModel):
     id: str
@@ -27,3 +27,9 @@ class UserResponseSchema(BaseModel):
     access_token: str
     refresh_token: str
     user: UserSchema
+
+
+class UserRefreshInDBSchema(BaseModel):
+    user_id: str
+    jti: str
+    expires_at: datetime

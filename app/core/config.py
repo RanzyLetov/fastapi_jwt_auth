@@ -1,6 +1,6 @@
+from typing import Any
 from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from typing import Any
 
 class Settings(BaseSettings):
     ALGORITHM: str = "HS256"
