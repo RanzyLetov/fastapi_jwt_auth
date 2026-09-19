@@ -1,7 +1,6 @@
 import bcrypt
 import jwt
 from datetime import datetime, timedelta, timezone
-from uuid import uuid4
 from fastapi import HTTPException, status
 
 from app.core.config import settings
@@ -24,7 +23,6 @@ def create_access_token(user_id: str) -> str:
         exp=time + timedelta(minutes=15),
         iat=time,
         type="access",
-        jti=str(uuid4()),
     ).model_dump()
 
     return jwt.encode(payload, key=settings.SECRET_KEY, algorithm=settings.ALGORITHM)
@@ -37,7 +35,6 @@ def create_refresh_token(user_id: str) -> str:
         exp=time + timedelta(days=30),
         iat=time,
         type="refresh",
-        jti=str(uuid4()),
     ).model_dump()
 
     return jwt.encode(payload, key=settings.SECRET_KEY, algorithm=settings.ALGORITHM)

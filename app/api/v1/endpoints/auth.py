@@ -1,5 +1,3 @@
-from datetime import datetime, timezone
-from uuid import uuid4
 from fastapi import APIRouter, Depends, HTTPException, status
 from app.api.v1.dependencies import get_token_from_header
 from app.core.security import create_access_token, create_refresh_token, decode_token, hash_password, verify_password
@@ -23,12 +21,9 @@ def register(payload: UserRegisterSchema):
         raise HTTPException(status_code=400, detail="Пароли не совпадают.")
     
     new_user = UserInDBSchema(
-        id=str(uuid4()),
         username=payload.username,
         first_name=payload.first_name,
         email=payload.email,
-        rule="user",
-        created_at=datetime.now(timezone.utc),
         hashed_password=hash_password(payload.password),
     )
 
