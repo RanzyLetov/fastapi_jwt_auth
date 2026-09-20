@@ -5,6 +5,7 @@ from fastapi import HTTPException, status
 
 from app.core.config import settings
 from app.schemas.token import TokenDataSchema
+from app.schemas.user import UserVerificationInDBSchema
 
 def hash_password(password: str) -> str:
     return bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")

@@ -1,5 +1,6 @@
 from uuid import uuid4
-from datetime import datetime, timezone
+import random
+from datetime import datetime, timezone, timedelta
 from pydantic import BaseModel, EmailStr, Field
 
 class UserSchema(BaseModel):
@@ -36,3 +37,14 @@ class UserRefreshInDBSchema(BaseModel):
     expires_at: datetime
 
     jti: str = Field(default_factory=lambda: str(uuid4()))
+
+class UserVerificationInDBSchema(BaseModel):
+    user_id: str
+    code: str
+    expires_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc) + timedelta(minutes=15))
+
+class UserVerificationRequestSchema(BaseModel):
+    email: EmailStr
+
+class UserVerifySchema(BaseModel):
+    code: str
