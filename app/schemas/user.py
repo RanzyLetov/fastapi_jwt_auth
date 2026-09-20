@@ -23,10 +23,6 @@ class UserRegisterSchema(BaseModel):
     password: str
     password_confirm: str
 
-class UserLoginSchema(BaseModel):
-    email: EmailStr
-    password: str
-
 class UserResponseSchema(BaseModel):
     access_token: str
     refresh_token: str
@@ -42,9 +38,6 @@ class UserVerificationInDBSchema(BaseModel):
     user_id: str
     code: str
     expires_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc) + timedelta(minutes=15))
-
-class UserVerificationRequestSchema(BaseModel):
-    email: EmailStr
 
 class UserVerifySchema(BaseModel):
     code: str
