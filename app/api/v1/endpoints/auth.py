@@ -98,6 +98,39 @@ def login(response: Response, payload: OAuth2PasswordRequestForm = Depends()):
     )
 
 
+@router.post("/logout")
+def logout(
+    response: Response,
+    refresh_token: str = Cookie(None),
+    token_data: TokenDataSchema = Depends(get_token_from_header),
+):
+    if refresh_token is None:
+        response.delete_cookie(key="refresh_token")
+        return {"message": "Успешный выход"}
+
+    refresh_token_data = decode_token(refresh_token)
+
+    for user in REFRESH_TOKEN_DB:
+        if user.jti == refresh_token_data.jti:
+            REFRESH_TOKEN_DB.remove(user)
+            break
+    response.delete_cookie(key="refresh_token")
+
+    return {"message": "Успешный выход"}
+
+
+@router.post("/logout-all")
+def logout_all(
+    response: Response,
+    token_data: TokenDataSchema = Depends(get_token_from_header),
+):
+    global REFRESH_TOKEN_DB
+    REFRESH_TOKEN_DB = [t for t in REFRESH_TOKEN_DB if t.user_id != token_data.sub]
+
+    response.delete_cookie(key="refresh_token")
+    
+    return {"message": "Успешный выход"}
+
 @router.post("/refresh")
 def refresh(
     response: Response, refresh_token: str = Cookie(None)
