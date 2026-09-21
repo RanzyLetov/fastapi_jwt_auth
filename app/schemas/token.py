@@ -11,5 +11,4 @@ class TokenDataSchema(BaseModel):
     jti: str = Field(default_factory=lambda: str(uuid4()))
 
 class TokenRefreshSchema(BaseModel):
-    refresh_token: str
     access_token: str

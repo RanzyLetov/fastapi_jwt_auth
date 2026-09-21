@@ -25,7 +25,6 @@ class UserRegisterSchema(BaseModel):
 
 class UserResponseSchema(BaseModel):
     access_token: str
-    refresh_token: str
     user: UserSchema
 
 class UserRefreshInDBSchema(BaseModel):

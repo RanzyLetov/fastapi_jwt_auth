@@ -3,7 +3,7 @@ import smtplib
 from datetime import datetime, timezone
 from email.message import EmailMessage
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Response, Cookie
 from fastapi.security import OAuth2PasswordRequestForm
 
 from app.api.v1.dependencies import get_token_from_header
@@ -52,7 +52,7 @@ def register(payload: UserRegisterSchema):
     return UserSchema.model_validate(new_user)
 
 @router.post("/login")
-def login(payload: OAuth2PasswordRequestForm = Depends()):
+def login(response: Response, payload: OAuth2PasswordRequestForm = Depends()):
     found = None
     for user in USERS_DB: 
         if user.email == payload.username: 
@@ -75,18 +75,30 @@ def login(payload: OAuth2PasswordRequestForm = Depends()):
         expires_at=refresh_token_data.exp,
     ))
 
+    response.set_cookie(
+        key="refresh_token",
+        value=refresh_token,
+        httponly=True,
+        samesite="lax",
+        secure=False, # Нужно будет поменять на проде с https
+    )
+
     return UserResponseSchema(
         access_token=access_token,
-        refresh_token=refresh_token,
         user=UserSchema.model_validate(found)
     )
 
 @router.post("/refresh")
-def refresh(old_token_data: TokenDataSchema = Depends(get_token_from_header)) -> TokenRefreshSchema:
+def refresh(response: Response, refresh_token: str = Cookie(None)) -> TokenRefreshSchema:
+    if refresh_token is None:
+        raise HTTPException(status_code=401, detail="Refresh-токен не найден в куках")
+    
+    refresh_token_data = decode_token(refresh_token)
+    
     found_id = None
 
     for token_entry in REFRESH_TOKEN_DB:
-        if token_entry.jti == old_token_data.jti:
+        if token_entry.jti == refresh_token_data.jti:
             found_id = token_entry.user_id
             REFRESH_TOKEN_DB.remove(token_entry)
             break
@@ -94,23 +106,27 @@ def refresh(old_token_data: TokenDataSchema = Depends(get_token_from_header)) ->
     if found_id is None:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED)
 
-    access_token = create_access_token(found_id)
-    refresh_token = create_refresh_token(found_id)
-    refresh_token_data = decode_token(refresh_token)
+    new_access_token = create_access_token(found_id)
+    new_refresh_token = create_refresh_token(found_id)
+    new_refresh_token_data = decode_token(new_refresh_token)
 
     REFRESH_TOKEN_DB.append(UserRefreshInDBSchema(
-        user_id=refresh_token_data.sub,
-        jti=refresh_token_data.jti,
-        expires_at=refresh_token_data.exp,
+        user_id=new_refresh_token_data.sub,
+        jti=new_refresh_token_data.jti,
+        expires_at=new_refresh_token_data.exp,
     ))
 
-    for user in USERS_DB:
-        if user.id == found_id:
-            return TokenRefreshSchema(
-                access_token=access_token,
-                refresh_token=refresh_token,
-            )
-    raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED)
+    response.set_cookie(
+        key="refresh_token",
+        value=refresh_token,
+        httponly=True,
+        samesite="lax",
+        secure=False, # Нужно будет поменять на проде с https
+    )
+
+    return TokenRefreshSchema(
+        access_token=new_access_token
+    )
 
 @router.post("/resend-code")
 def send_verification_code(token_data: TokenDataSchema = Depends(get_token_from_header)):
