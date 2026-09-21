@@ -1,6 +1,8 @@
 from typing import Any
-from pydantic import field_validator, EmailStr
+
+from pydantic import EmailStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
 
 class Settings(BaseSettings):
     ALGORITHM: str = "HS256"
@@ -10,7 +12,7 @@ class Settings(BaseSettings):
     CORS_ORIGINS: Any = ["http://localhost:3000"]
 
     SMTP_HOST: str
-    SMTP_PORT: str 
+    SMTP_PORT: str
     SMTP_USER: EmailStr
     SMTP_PASSWORD: str
 
@@ -22,5 +24,6 @@ class Settings(BaseSettings):
         return value
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
-    
+
+
 settings = Settings()

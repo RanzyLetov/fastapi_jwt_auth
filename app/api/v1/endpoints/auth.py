@@ -3,7 +3,7 @@ import smtplib
 from datetime import datetime, timezone
 from email.message import EmailMessage
 
-from fastapi import APIRouter, Depends, HTTPException, status, Response, Cookie
+from fastapi import APIRouter, Cookie, Depends, HTTPException, Response, status
 from fastapi.security import OAuth2PasswordRequestForm
 
 from app.api.v1.dependencies import get_token_from_header
@@ -29,17 +29,20 @@ from app.schemas.user import (
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
+
 @router.post("/register")
 def register(payload: UserRegisterSchema):
-    for user in USERS_DB: 
-        if user.email == payload.email: 
-            raise HTTPException(status_code=409, detail="Эта почта уже привязана к другому аккаунту.")
+    for user in USERS_DB:
+        if user.email == payload.email:
+            raise HTTPException(
+                status_code=409, detail="Эта почта уже привязана к другому аккаунту."
+            )
         if user.username == payload.username:
             raise HTTPException(status_code=409, detail="Этот username уже занят.")
 
     if payload.password != payload.password_confirm:
         raise HTTPException(status_code=400, detail="Пароли не совпадают.")
-    
+
     new_user = UserInDBSchema(
         username=payload.username,
         first_name=payload.first_name,
@@ -47,54 +50,63 @@ def register(payload: UserRegisterSchema):
         hashed_password=hash_password(payload.password),
     )
 
-    USERS_DB.append(new_user)    
+    USERS_DB.append(new_user)
 
     return UserSchema.model_validate(new_user)
+
 
 @router.post("/login")
 def login(response: Response, payload: OAuth2PasswordRequestForm = Depends()):
     found = None
-    for user in USERS_DB: 
-        if user.email == payload.username: 
+    for user in USERS_DB:
+        if user.email == payload.username:
             found = user
             break
 
     if found is None:
-        raise HTTPException(status_code=404, detail="Пользователь с такой почтой не найден.")
+        raise HTTPException(
+            status_code=404, detail="Пользователь с такой почтой не найден."
+        )
 
-    if not verify_password(password=payload.password, hashed_password=found.hashed_password):
+    if not verify_password(
+        password=payload.password, hashed_password=found.hashed_password
+    ):
         raise HTTPException(status_code=401, detail="Неверный пароль.")
-    
+
     access_token = create_access_token(found.id)
     refresh_token = create_refresh_token(found.id)
     refresh_token_data = decode_token(refresh_token)
 
-    REFRESH_TOKEN_DB.append(UserRefreshInDBSchema(
-        user_id=refresh_token_data.sub,
-        jti=refresh_token_data.jti,
-        expires_at=refresh_token_data.exp,
-    ))
+    REFRESH_TOKEN_DB.append(
+        UserRefreshInDBSchema(
+            user_id=refresh_token_data.sub,
+            jti=refresh_token_data.jti,
+            expires_at=refresh_token_data.exp,
+        )
+    )
 
     response.set_cookie(
         key="refresh_token",
         value=refresh_token,
         httponly=True,
         samesite="lax",
-        secure=False, # Нужно будет поменять на проде с https
+        secure=False,  # Нужно будет поменять на проде с https
     )
 
     return UserResponseSchema(
-        access_token=access_token,
-        user=UserSchema.model_validate(found)
+        access_token=access_token, user=UserSchema.model_validate(found)
     )
 
+
 @router.post("/refresh")
-def refresh(response: Response, refresh_token: str = Cookie(None)) -> TokenRefreshSchema:
+def refresh(
+    response: Response, refresh_token: str = Cookie(None)
+) -> TokenRefreshSchema:
     if refresh_token is None:
         raise HTTPException(status_code=401, detail="Refresh-токен не найден в куках")
-    
+
     refresh_token_data = decode_token(refresh_token)
-    
+
     found_id = None
 
     for token_entry in REFRESH_TOKEN_DB:
@@ -110,26 +122,29 @@ def refresh(response: Response, refresh_token: str = Cookie(None)) -> TokenRefre
     new_refresh_token = create_refresh_token(found_id)
     new_refresh_token_data = decode_token(new_refresh_token)
 
-    REFRESH_TOKEN_DB.append(UserRefreshInDBSchema(
-        user_id=new_refresh_token_data.sub,
-        jti=new_refresh_token_data.jti,
-        expires_at=new_refresh_token_data.exp,
-    ))
+    REFRESH_TOKEN_DB.append(
+        UserRefreshInDBSchema(
+            user_id=new_refresh_token_data.sub,
+            jti=new_refresh_token_data.jti,
+            expires_at=new_refresh_token_data.exp,
+        )
+    )
 
     response.set_cookie(
         key="refresh_token",
         value=refresh_token,
         httponly=True,
         samesite="lax",
-        secure=False, # Нужно будет поменять на проде с https
+        secure=False,  # Нужно будет поменять на проде с https
     )
 
-    return TokenRefreshSchema(
-        access_token=new_access_token
-    )
+    return TokenRefreshSchema(access_token=new_access_token)
+
 
 @router.post("/resend-code")
-def send_verification_code(token_data: TokenDataSchema = Depends(get_token_from_header)):
+def send_verification_code(
+    token_data: TokenDataSchema = Depends(get_token_from_header),
+):
     for entry in VERIFICATION_CODES_DB:
         if entry.user_id == token_data.sub:
             VERIFICATION_CODES_DB.remove(entry)
@@ -144,8 +159,8 @@ def send_verification_code(token_data: TokenDataSchema = Depends(get_token_from_
     )
 
     user_emails = [item.email for item in USERS_DB if item.id == token_data.sub]
-    
-    target_email = user_emails[0] 
+
+    target_email = user_emails[0]
 
     msg = EmailMessage()
     msg["From"] = settings.SMTP_USER
@@ -164,8 +179,12 @@ def send_verification_code(token_data: TokenDataSchema = Depends(get_token_from_
 
     return {"message": "Код успешно отправлен на вашу почту."}
 
+
 @router.post("/verify-email")
-def verify_email(payload: UserVerifySchema, token_data: TokenDataSchema = Depends(get_token_from_header)):
+def verify_email(
+    payload: UserVerifySchema,
+    token_data: TokenDataSchema = Depends(get_token_from_header),
+):
     found_entry = None
 
     for entry in VERIFICATION_CODES_DB:
@@ -175,7 +194,6 @@ def verify_email(payload: UserVerifySchema, token_data: TokenDataSchema = Depend
 
     if found_entry is None:
         raise HTTPException(status_code=401, detail="Неверный код подтверждения")
-
 
     if datetime.now(timezone.utc) > found_entry.expires_at:
         VERIFICATION_CODES_DB.remove(found_entry)

@@ -1,4 +1,8 @@
-from app.schemas.user import UserInDBSchema, UserRefreshInDBSchema, UserVerificationInDBSchema
+from app.schemas.user import (
+    UserInDBSchema,
+    UserRefreshInDBSchema,
+    UserVerificationInDBSchema,
+)
 
 USERS_DB: list[UserInDBSchema] = []
 REFRESH_TOKEN_DB: list[UserRefreshInDBSchema] = []
