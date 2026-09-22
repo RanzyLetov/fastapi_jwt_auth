@@ -211,8 +211,7 @@ def send_verification_code(
 
             server.login(settings.SMTP_USER, settings.SMTP_PASSWORD)
             server.send_message(msg)
-    except Exception as e:
-        print(f"ПОЧТОВАЯ ОШИБКА ДЛЯ ОТЛАДКИ: {e}")
+    except (smtplib.SMTPException, OSError):
         raise HTTPException(status_code=500, detail="Ошибка отправки почты")
 
     return {"message": "Код успешно отправлен на вашу почту."}
