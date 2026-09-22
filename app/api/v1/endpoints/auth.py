@@ -2,6 +2,7 @@ import random
 import smtplib
 from datetime import datetime, timezone
 from email.message import EmailMessage
+from typing import Annotated
 
 from fastapi import APIRouter, Cookie, Depends, HTTPException, Response, status
 from fastapi.security import OAuth2PasswordRequestForm
@@ -56,7 +57,10 @@ def register(payload: UserRegisterSchema):
 
 
 @router.post("/login")
-def login(response: Response, payload: OAuth2PasswordRequestForm = Depends()):
+def login(
+    response: Response,
+    payload: Annotated[OAuth2PasswordRequestForm, Depends(OAuth2PasswordRequestForm)],
+):
     found = None
     for user in USERS_DB:
         if user.email == payload.username:
@@ -101,8 +105,8 @@ def login(response: Response, payload: OAuth2PasswordRequestForm = Depends()):
 @router.post("/logout")
 def logout(
     response: Response,
+    token_data: Annotated[TokenDataSchema, Depends(get_token_from_header)],
     refresh_token: str = Cookie(None),
-    token_data: TokenDataSchema = Depends(get_token_from_header),
 ):
     if refresh_token is None:
         response.delete_cookie(key="refresh_token")
@@ -122,14 +126,15 @@ def logout(
 @router.post("/logout-all")
 def logout_all(
     response: Response,
-    token_data: TokenDataSchema = Depends(get_token_from_header),
+    token_data: Annotated[TokenDataSchema, Depends(get_token_from_header)],
 ):
     global REFRESH_TOKEN_DB
     REFRESH_TOKEN_DB = [t for t in REFRESH_TOKEN_DB if t.user_id != token_data.sub]
 
     response.delete_cookie(key="refresh_token")
-    
+
     return {"message": "Успешный выход"}
+
 
 @router.post("/refresh")
 def refresh(
@@ -176,7 +181,7 @@ def refresh(
 
 @router.post("/resend-code")
 def send_verification_code(
-    token_data: TokenDataSchema = Depends(get_token_from_header),
+    token_data: Annotated[TokenDataSchema, Depends(get_token_from_header)],
 ):
     for entry in VERIFICATION_CODES_DB:
         if entry.user_id == token_data.sub:
@@ -216,7 +221,7 @@ def send_verification_code(
 @router.post("/verify-email")
 def verify_email(
     payload: UserVerifySchema,
-    token_data: TokenDataSchema = Depends(get_token_from_header),
+    token_data: Annotated[TokenDataSchema, Depends(get_token_from_header)],
 ):
     found_entry = None
 
