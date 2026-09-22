@@ -1,6 +1,6 @@
 from typing import Any
 
-from pydantic import EmailStr, Field, field_validator
+from pydantic import EmailStr, Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -11,10 +11,10 @@ class Settings(BaseSettings):
 
     CORS_ORIGINS: Any = ["http://localhost:3000"]
 
-    SMTP_HOST: str = Field(default=Ellipsis)
-    SMTP_PORT: int = Field(default=Ellipsis)
-    SMTP_USER: EmailStr = Field(default=Ellipsis)
-    SMTP_PASSWORD: str = Field(default=Ellipsis)
+    SMTP_HOST: str = Field(default=...)
+    SMTP_PORT: int = Field(default=...)
+    SMTP_USER: EmailStr = Field(default=...)
+    SMTP_PASSWORD: SecretStr = Field(default=...)
 
     @field_validator("CORS_ORIGINS", mode="before")
     @classmethod
