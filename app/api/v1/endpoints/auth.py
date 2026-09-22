@@ -170,7 +170,7 @@ def refresh(
 
     response.set_cookie(
         key="refresh_token",
-        value=refresh_token,
+        value=new_refresh_token,
         httponly=True,
         samesite="lax",
         secure=False,  # Нужно будет поменять на проде с https
