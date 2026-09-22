@@ -1,5 +1,6 @@
 from typing import Any
 
+from fastapi_mail import ConnectionConfig
 from pydantic import EmailStr, Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -27,3 +28,23 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
+
+
+email_config = ConnectionConfig(
+    MAIL_SERVER=settings.SMTP_HOST,
+    MAIL_PORT=int(settings.SMTP_PORT),
+    MAIL_USERNAME=settings.SMTP_USER,
+    MAIL_PASSWORD=settings.SMTP_PASSWORD,
+    MAIL_FROM=settings.SMTP_USER,
+    MAIL_STARTTLS=True,
+    MAIL_SSL_TLS=False,
+    USE_CREDENTIALS=True,
+    VALIDATE_CERTS=True,
+    TIMEOUT=15,
+    MAIL_DEBUG=False,
+    SUPPRESS_SEND=False,
+    MAIL_FROM_NAME=None,
+    TEMPLATE_FOLDER=None,
+    LOCAL_HOSTNAME=None,
+    CERT_BUNDLE=None,
+)

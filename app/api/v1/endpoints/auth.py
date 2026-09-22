@@ -1,14 +1,13 @@
 import random
-import smtplib
 from datetime import datetime, timezone
-from email.message import EmailMessage
 from typing import Annotated
 
 from fastapi import APIRouter, Cookie, Depends, HTTPException, Response, status
 from fastapi.security import OAuth2PasswordRequestForm
+from fastapi_mail import FastMail, MessageSchema, MessageType, NameEmail
 
 from app.api.v1.dependencies import get_token_from_header
-from app.core.config import settings
+from app.core.config import email_config
 from app.core.security import (
     create_access_token,
     create_refresh_token,
@@ -68,13 +67,9 @@ def login(
             break
 
     if found is None:
-        raise HTTPException(
-            status_code=404, detail="Пользователь с такой почтой не найден."
-        )
+        raise HTTPException(status_code=404, detail="Пользователь с такой почтой не найден.")
 
-    if not verify_password(
-        password=payload.password, hashed_password=found.hashed_password
-    ):
+    if not verify_password(password=payload.password, hashed_password=found.hashed_password):
         raise HTTPException(status_code=401, detail="Неверный пароль.")
 
     access_token = create_access_token(found.id)
@@ -97,9 +92,7 @@ def login(
         secure=False,  # Нужно будет поменять на проде с https
     )
 
-    return UserResponseSchema(
-        access_token=access_token, user=UserSchema.model_validate(found)
-    )
+    return UserResponseSchema(access_token=access_token, user=UserSchema.model_validate(found))
 
 
 @router.post("/logout")
@@ -137,9 +130,7 @@ def logout_all(
 
 
 @router.post("/refresh")
-def refresh(
-    response: Response, refresh_token: str = Cookie(None)
-) -> TokenRefreshSchema:
+def refresh(response: Response, refresh_token: str = Cookie(None)) -> TokenRefreshSchema:
     if refresh_token is None:
         raise HTTPException(status_code=401, detail="Refresh-токен не найден в куках")
 
@@ -180,7 +171,7 @@ def refresh(
 
 
 @router.post("/resend-code")
-def send_verification_code(
+async def send_verification_code(
     token_data: Annotated[TokenDataSchema, Depends(get_token_from_header)],
 ):
     for entry in VERIFICATION_CODES_DB:
@@ -200,19 +191,20 @@ def send_verification_code(
 
     target_email = user_emails[0]
 
-    msg = EmailMessage()
-    msg["From"] = settings.SMTP_USER
-    msg["To"] = target_email
-    msg.set_content(random_code)
+    message = MessageSchema(
+        subject="Код подтверждения",
+        body=random_code,
+        recipients=[NameEmail(name="", email=target_email)],
+        subtype=MessageType.plain,
+    )
 
+    fm = FastMail(email_config)
     try:
-        with smtplib.SMTP(host=settings.SMTP_HOST, port=settings.SMTP_PORT) as server:
-            server.starttls()
-
-            server.login(settings.SMTP_USER, settings.SMTP_PASSWORD)
-            server.send_message(msg)
-    except (smtplib.SMTPException, OSError):
-        raise HTTPException(status_code=500, detail="Ошибка отправки почты")
+        await fm.send_message(message)
+    except Exception as e:
+        print(f"❌ КРИТИЧЕСКАЯ ОШИБКА ПОЧТЫ: {e}")
+        print(f"❌ ТИП ОШИБКИ: {type(e)}")
+        raise HTTPException(status_code=500, detail=f"Ошибка отправки почты: {e!s}")
 
     return {"message": "Код успешно отправлен на вашу почту."}
 
