@@ -98,7 +98,6 @@ def login(
 @router.post("/logout")
 def logout(
     response: Response,
-    token_data: Annotated[TokenDataSchema, Depends(get_token_from_header)],
     refresh_token: str = Cookie(None),
 ):
     if refresh_token is None:
