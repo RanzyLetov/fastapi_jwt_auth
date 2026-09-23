@@ -12,6 +12,8 @@ class TokenDataSchema(BaseModel):
 
     jti: str = Field(default_factory=lambda: str(uuid4()))
 
+class TokenAccessDataSchema(TokenDataSchema):
+    is_verified: bool = False
 
 class TokenRefreshSchema(BaseModel):
     access_token: str

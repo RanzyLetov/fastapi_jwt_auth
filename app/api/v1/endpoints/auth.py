@@ -72,7 +72,10 @@ def login(
     if not verify_password(password=payload.password, hashed_password=found.hashed_password):
         raise HTTPException(status_code=401, detail="Неверный пароль.")
 
-    access_token = create_access_token(found.id)
+    if not found.is_verified:
+        raise HTTPException(status_code=403, detail="Пользователь не подтвержден.")
+
+    access_token = create_access_token(found.id, found.is_verified)
     refresh_token = create_refresh_token(found.id)
     refresh_token_data = decode_token(refresh_token)
 

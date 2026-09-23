@@ -5,7 +5,7 @@ import jwt
 from fastapi import HTTPException, status
 
 from app.core.config import settings
-from app.schemas.token import TokenDataSchema
+from app.schemas.token import TokenAccessDataSchema, TokenDataSchema
 
 
 def hash_password(password: str) -> str:
@@ -19,11 +19,12 @@ def verify_password(password: str, hashed_password: str) -> bool:
     )
 
 
-def create_access_token(user_id: str) -> str:
+def create_access_token(user_id: str, is_verified: bool) -> str:
     time = datetime.now(timezone.utc)
 
-    payload = TokenDataSchema(
+    payload = TokenAccessDataSchema(
         sub=user_id,
+        is_verified=is_verified,
         exp=time + timedelta(minutes=15),
         iat=time,
         type="access",
