@@ -1,19 +1,16 @@
 from datetime import datetime
-from uuid import uuid4
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 
-class TokenDataSchema(BaseModel):
+class AnyTokenDataSchema(BaseModel):
     sub: str
     exp: datetime
     iat: datetime
     type: str
-
-    jti: str = Field(default_factory=lambda: str(uuid4()))
-
-class TokenAccessDataSchema(TokenDataSchema):
     is_verified: bool = False
+    jti: str | None = None
+
 
 class TokenRefreshSchema(BaseModel):
     access_token: str

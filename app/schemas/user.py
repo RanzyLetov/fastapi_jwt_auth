@@ -1,7 +1,8 @@
 from datetime import datetime, timedelta, timezone
+from typing import Self
 from uuid import uuid4
 
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, model_validator
 
 
 class UserSchema(BaseModel):
@@ -14,6 +15,8 @@ class UserSchema(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid4()))
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
+    model_config = ConfigDict(from_attributes=True)
+
 
 class UserInDBSchema(UserSchema):
     hashed_password: str
@@ -25,6 +28,12 @@ class UserRegisterSchema(BaseModel):
     email: EmailStr
     password: str
     password_confirm: str
+
+    @model_validator(mode="after")
+    def check_passwords_match(self) -> Self:
+        if self.password != self.password_confirm:
+            raise ValueError("Пароли не совпадают")
+        return self
 
 
 class UserResponseSchema(BaseModel):

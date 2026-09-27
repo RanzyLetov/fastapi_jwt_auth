@@ -1,11 +1,12 @@
 from datetime import datetime, timedelta, timezone
+from uuid import uuid4
 
 import bcrypt
 import jwt
 from fastapi import HTTPException, status
 
 from app.core.config import settings
-from app.schemas.token import TokenAccessDataSchema, TokenDataSchema
+from app.schemas.token import AnyTokenDataSchema
 
 
 def hash_password(password: str) -> str:
@@ -22,7 +23,7 @@ def verify_password(password: str, hashed_password: str) -> bool:
 def create_access_token(user_id: str, is_verified: bool) -> str:
     time = datetime.now(timezone.utc)
 
-    payload = TokenAccessDataSchema(
+    payload = AnyTokenDataSchema(
         sub=user_id,
         is_verified=is_verified,
         exp=time + timedelta(minutes=15),
@@ -36,21 +37,23 @@ def create_access_token(user_id: str, is_verified: bool) -> str:
 def create_refresh_token(user_id: str) -> str:
     time = datetime.now(timezone.utc)
 
-    payload = TokenDataSchema(
+    payload = AnyTokenDataSchema(
         sub=user_id,
         exp=time + timedelta(days=30),
         iat=time,
         type="refresh",
+        jti=str(uuid4()),
     ).model_dump()
 
     return jwt.encode(payload, key=settings.SECRET_KEY, algorithm=settings.ALGORITHM)
 
 
-def decode_token(token: str) -> TokenDataSchema:
+def decode_token(token: str) -> AnyTokenDataSchema:
     try:
-        decoded_dict = jwt.decode(
-            token, key=settings.SECRET_KEY, algorithms=settings.ALGORITHM
-        )
+        decoded_dict = jwt.decode(token, key=settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+        decoded_dict["exp"] = datetime.fromtimestamp(timestamp=decoded_dict["exp"], tz=timezone.utc)
+        decoded_dict["iat"] = datetime.fromtimestamp(timestamp=decoded_dict["iat"], tz=timezone.utc)
     except jwt.PyJWTError:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED)
-    return TokenDataSchema(**decoded_dict)
+
+    return AnyTokenDataSchema(**decoded_dict)

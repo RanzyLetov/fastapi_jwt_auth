@@ -1,13 +1,18 @@
 import random
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Annotated
 
 from fastapi import APIRouter, Cookie, Depends, HTTPException, Response, status
+from fastapi.concurrency import run_in_threadpool
 from fastapi.security import OAuth2PasswordRequestForm
 from fastapi_mail import FastMail, MessageSchema, MessageType, NameEmail
+from sqlalchemy import delete, or_
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import Session
 
 from app.api.v1.dependencies import get_token_from_header
-from app.core.config import email_config
+from app.core.config import email_config, settings
+from app.core.database import get_db
 from app.core.security import (
     create_access_token,
     create_refresh_token,
@@ -15,15 +20,12 @@ from app.core.security import (
     hash_password,
     verify_password,
 )
-from app.database import REFRESH_TOKEN_DB, USERS_DB, VERIFICATION_CODES_DB
-from app.schemas.token import TokenDataSchema, TokenRefreshSchema
+from app.models.user import Refresh, User, Verification
+from app.schemas.token import AnyTokenDataSchema, TokenRefreshSchema
 from app.schemas.user import (
-    UserInDBSchema,
-    UserRefreshInDBSchema,
     UserRegisterSchema,
     UserResponseSchema,
     UserSchema,
-    UserVerificationInDBSchema,
     UserVerifySchema,
 )
 
@@ -31,61 +33,68 @@ router = APIRouter(prefix="/auth", tags=["Authentication"])
 
 
 @router.post("/register")
-def register(payload: UserRegisterSchema):
-    for user in USERS_DB:
-        if user.email == payload.email:
-            raise HTTPException(
-                status_code=409, detail="Эта почта уже привязана к другому аккаунту."
-            )
-        if user.username == payload.username:
-            raise HTTPException(status_code=409, detail="Этот username уже занят.")
+def register(
+    payload: UserRegisterSchema,
+    db: Annotated[Session, Depends(get_db)],
+):
 
-    if payload.password != payload.password_confirm:
-        raise HTTPException(status_code=400, detail="Пароли не совпадают.")
+    existing_email = (
+        db
+        .query(User)
+        .filter(or_(User.email == payload.email, User.username == payload.username))
+        .first()
+    )
 
-    new_user = UserInDBSchema(
+    if existing_email:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Эта почта или имя пользователя уже существует.",
+        )
+
+    db_user = User(
         username=payload.username,
         first_name=payload.first_name,
         email=payload.email,
         hashed_password=hash_password(payload.password),
     )
 
-    USERS_DB.append(new_user)
+    db.add(db_user)
 
-    return UserSchema.model_validate(new_user)
+    try:
+        db.commit()
+    except IntegrityError as e:
+        raise HTTPException(status_code=409, detail="Такой пользователь уже существует") from e
+
+    return {"message": "Регистрация прошла успешно."}
 
 
 @router.post("/login")
 def login(
     response: Response,
-    payload: Annotated[OAuth2PasswordRequestForm, Depends(OAuth2PasswordRequestForm)],
+    payload: Annotated[OAuth2PasswordRequestForm, Depends()],
+    db: Annotated[Session, Depends(get_db)],
 ):
-    found = None
-    for user in USERS_DB:
-        if user.email == payload.username:
-            found = user
-            break
 
-    if found is None:
-        raise HTTPException(status_code=404, detail="Пользователь с такой почтой не найден.")
+    found_user = db.query(User).filter(User.email == payload.username).first()
 
-    if not verify_password(password=payload.password, hashed_password=found.hashed_password):
-        raise HTTPException(status_code=401, detail="Неверный пароль.")
+    if found_user is None:
+        verify_password(password=payload.password, hashed_password=settings.DEFAULT_HASHED_PASSWORD)
+        raise HTTPException(status_code=401, detail="Почта или пароль не верны")
 
-    if not found.is_verified:
-        raise HTTPException(status_code=403, detail="Пользователь не подтвержден.")
+    if not verify_password(password=payload.password, hashed_password=found_user.hashed_password):
+        raise HTTPException(status_code=401, detail="Почта или пароль не верны")
 
-    access_token = create_access_token(found.id, found.is_verified)
-    refresh_token = create_refresh_token(found.id)
+    access_token = create_access_token(found_user.id, found_user.is_verified)
+    refresh_token = create_refresh_token(found_user.id)
     refresh_token_data = decode_token(refresh_token)
 
-    REFRESH_TOKEN_DB.append(
-        UserRefreshInDBSchema(
-            user_id=refresh_token_data.sub,
-            jti=refresh_token_data.jti,
-            expires_at=refresh_token_data.exp,
-        )
+    db_refresh_token = Refresh(
+        user_id=found_user.id,
+        jti=refresh_token_data.jti,
+        expires_at=refresh_token_data.exp,
     )
+
+    db.add(db_refresh_token)
 
     response.set_cookie(
         key="refresh_token",
@@ -95,13 +104,14 @@ def login(
         secure=False,  # Нужно будет поменять на проде с https
     )
 
-    return UserResponseSchema(access_token=access_token, user=UserSchema.model_validate(found))
+    return UserResponseSchema(access_token=access_token, user=UserSchema.model_validate(found_user))
 
 
 @router.post("/logout")
 def logout(
     response: Response,
-    refresh_token: str = Cookie(None),
+    db: Annotated[Session, Depends(get_db)],
+    refresh_token: str | None = Cookie(None),
 ):
     if refresh_token is None:
         response.delete_cookie(key="refresh_token")
@@ -109,10 +119,10 @@ def logout(
 
     refresh_token_data = decode_token(refresh_token)
 
-    for user in REFRESH_TOKEN_DB:
-        if user.jti == refresh_token_data.jti:
-            REFRESH_TOKEN_DB.remove(user)
-            break
+    db.query(Refresh).filter(Refresh.jti == refresh_token_data.jti).delete(
+        synchronize_session=False
+    )
+
     response.delete_cookie(key="refresh_token")
 
     return {"message": "Успешный выход"}
@@ -121,10 +131,10 @@ def logout(
 @router.post("/logout-all")
 def logout_all(
     response: Response,
-    token_data: Annotated[TokenDataSchema, Depends(get_token_from_header)],
+    token_data: Annotated[AnyTokenDataSchema, Depends(get_token_from_header)],
+    db: Annotated[Session, Depends(get_db)],
 ):
-    global REFRESH_TOKEN_DB
-    REFRESH_TOKEN_DB = [t for t in REFRESH_TOKEN_DB if t.user_id != token_data.sub]
+    db.query(Refresh).filter(Refresh.user_id == token_data.sub).delete(synchronize_session=False)
 
     response.delete_cookie(key="refresh_token")
 
@@ -132,34 +142,37 @@ def logout_all(
 
 
 @router.post("/refresh")
-def refresh(response: Response, refresh_token: str = Cookie(None)) -> TokenRefreshSchema:
+def refresh(
+    response: Response,
+    db: Annotated[Session, Depends(get_db)],
+    refresh_token: str | None = Cookie(None),
+) -> TokenRefreshSchema:
     if refresh_token is None:
         raise HTTPException(status_code=401, detail="Refresh-токен не найден в куках")
 
     refresh_token_data = decode_token(refresh_token)
 
-    found_id = None
+    stmt = delete(Refresh).where(Refresh.jti == refresh_token_data.jti).returning(Refresh)
+    result = db.execute(stmt)
+    found_token = result.scalar_one_or_none()
 
-    for token_entry in REFRESH_TOKEN_DB:
-        if token_entry.jti == refresh_token_data.jti:
-            found_id = token_entry.user_id
-            REFRESH_TOKEN_DB.remove(token_entry)
-            break
-
-    if found_id is None:
+    if found_token is None:
+        db.query(Refresh).filter(Refresh.user_id == refresh_token_data.sub).delete(
+            synchronize_session=False
+        )
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED)
 
-    new_access_token = create_access_token(found_id)
-    new_refresh_token = create_refresh_token(found_id)
+    new_access_token = create_access_token(found_token.user_id, refresh_token_data.is_verified)
+    new_refresh_token = create_refresh_token(found_token.user_id)
     new_refresh_token_data = decode_token(new_refresh_token)
 
-    REFRESH_TOKEN_DB.append(
-        UserRefreshInDBSchema(
-            user_id=new_refresh_token_data.sub,
-            jti=new_refresh_token_data.jti,
-            expires_at=new_refresh_token_data.exp,
-        )
+    new_refresh_token_db = Refresh(
+        user_id=found_token.user_id,
+        expires_at=new_refresh_token_data.exp,
+        jti=new_refresh_token_data.jti,
     )
+
+    db.add(new_refresh_token_db)
 
     response.set_cookie(
         key="refresh_token",
@@ -174,29 +187,35 @@ def refresh(response: Response, refresh_token: str = Cookie(None)) -> TokenRefre
 
 @router.post("/resend-code")
 async def send_verification_code(
-    token_data: Annotated[TokenDataSchema, Depends(get_token_from_header)],
+    token_data: Annotated[AnyTokenDataSchema, Depends(get_token_from_header)],
+    db: Annotated[Session, Depends(get_db)],
 ):
-    for entry in VERIFICATION_CODES_DB:
-        if entry.user_id == token_data.sub:
-            VERIFICATION_CODES_DB.remove(entry)
+    user_email = await run_in_threadpool(
+        db.query(User.email).filter(User.id == token_data.sub).scalar()
+    )
+    if user_email is None:
+        raise HTTPException(status_code=404, detail="Пользователь не найден")
 
     random_code: str = str(random.randint(100000, 999999))
+    expire_time = datetime.now(timezone.utc) + timedelta(minutes=15)
 
-    VERIFICATION_CODES_DB.append(
-        UserVerificationInDBSchema(
-            user_id=token_data.sub,
-            code=random_code,
-        )
+    found_verification = (
+        db.query(Verification).filter(Verification.user_id == token_data.sub).first()
     )
 
-    user_emails = [item.email for item in USERS_DB if item.id == token_data.sub]
-
-    target_email = user_emails[0]
+    if found_verification:
+        found_verification.code = random_code
+        found_verification.expires_at = expire_time
+    else:
+        db_verification = Verification(
+            user_id=token_data.sub, code=random_code, expires_at=expire_time
+        )
+        db.add(db_verification)
 
     message = MessageSchema(
         subject="Код подтверждения",
         body=random_code,
-        recipients=[NameEmail(name="", email=target_email)],
+        recipients=[NameEmail(name="", email=user_email)],
         subtype=MessageType.plain,
     )
 
@@ -204,9 +223,9 @@ async def send_verification_code(
     try:
         await fm.send_message(message)
     except Exception as e:
-        print(f"❌ КРИТИЧЕСКАЯ ОШИБКА ПОЧТЫ: {e}")
-        print(f"❌ ТИП ОШИБКИ: {type(e)}")
-        raise HTTPException(status_code=500, detail=f"Ошибка отправки почты: {e!s}")
+        raise HTTPException(
+            status_code=500, detail="Письмо не удалось отправить, попробуйте позже"
+        ) from e
 
     return {"message": "Код успешно отправлен на вашу почту."}
 
@@ -214,32 +233,30 @@ async def send_verification_code(
 @router.post("/verify-email")
 def verify_email(
     payload: UserVerifySchema,
-    token_data: Annotated[TokenDataSchema, Depends(get_token_from_header)],
+    token_data: Annotated[AnyTokenDataSchema, Depends(get_token_from_header)],
+    db: Annotated[Session, Depends(get_db)],
 ):
-    found_entry = None
-
-    for entry in VERIFICATION_CODES_DB:
-        if entry.user_id == token_data.sub and entry.code == payload.code:
-            found_entry = entry
-            break
+    found_entry = (
+        db
+        .query(Verification)
+        .filter(
+            Verification.user_id == token_data.sub,
+            Verification.code == payload.code,
+            Verification.expires_at > datetime.now(timezone.utc),
+        )
+        .first()
+    )
 
     if found_entry is None:
-        raise HTTPException(status_code=401, detail="Неверный код подтверждения")
+        raise HTTPException(status_code=401, detail="Неверный код или срок действия истек.")
 
-    if datetime.now(timezone.utc) > found_entry.expires_at:
-        VERIFICATION_CODES_DB.remove(found_entry)
-        raise HTTPException(status_code=401, detail="Срок действия кода истек")
+    found_user = db.query(User).filter(User.id == token_data.sub).first()
 
-    user_activated = False
-    for db_user in USERS_DB:
-        if db_user.id == token_data.sub:
-            db_user.is_verified = True
-            user_activated = True
-            break
+    if found_user is None:
+        raise HTTPException(status_code=404, detail="Такой пользователь не найден")
 
-    if not user_activated:
-        raise HTTPException(status_code=404, detail="Пользователь не найден")
+    found_user.is_verified = True
 
-    VERIFICATION_CODES_DB.remove(found_entry)
+    db.delete(found_entry)
 
     return {"message": "Почта успешно подтверждена!"}

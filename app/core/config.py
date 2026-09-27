@@ -6,9 +6,13 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
+    DATABASE_URL: str = Field(default=...)
+
     ALGORITHM: str = "HS256"
 
     SECRET_KEY: str = "default_access_fallback_secret"
+
+    DEFAULT_HASHED_PASSWORD: str = "$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewY5GyYILp92S.0i"
 
     CORS_ORIGINS: Any = ["http://localhost:3000"]
 
