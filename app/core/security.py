@@ -54,6 +54,6 @@ def decode_token(token: str) -> AnyTokenDataSchema:
         decoded_dict["exp"] = datetime.fromtimestamp(timestamp=decoded_dict["exp"], tz=timezone.utc)
         decoded_dict["iat"] = datetime.fromtimestamp(timestamp=decoded_dict["iat"], tz=timezone.utc)
     except jwt.PyJWTError:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED)
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED) from None
 
     return AnyTokenDataSchema(**decoded_dict)

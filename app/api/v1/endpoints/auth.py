@@ -48,7 +48,7 @@ def register(
     if existing_email:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail="Эта почта или имя пользователя уже существует.",
+            detail="Email or username already exists.",
         )
 
     db_user = User(
@@ -62,10 +62,10 @@ def register(
 
     try:
         db.commit()
-    except IntegrityError as e:
-        raise HTTPException(status_code=409, detail="Такой пользователь уже существует") from e
+    except IntegrityError:
+        raise HTTPException(status_code=409, detail="User already exists") from None
 
-    return {"message": "Регистрация прошла успешно."}
+    return {"message": "Registration successful."}
 
 
 @router.post("/login")
@@ -79,10 +79,10 @@ def login(
 
     if found_user is None:
         verify_password(password=payload.password, hashed_password=settings.DEFAULT_HASHED_PASSWORD)
-        raise HTTPException(status_code=401, detail="Почта или пароль не верны")
+        raise HTTPException(status_code=401, detail="Invalid email or password") from None
 
     if not verify_password(password=payload.password, hashed_password=found_user.hashed_password):
-        raise HTTPException(status_code=401, detail="Почта или пароль не верны")
+        raise HTTPException(status_code=401, detail="Invalid email or password") from None
 
     access_token = create_access_token(found_user.id, found_user.is_verified)
     refresh_token = create_refresh_token(found_user.id)
@@ -101,7 +101,7 @@ def login(
         value=refresh_token,
         httponly=True,
         samesite="lax",
-        secure=False,  # Нужно будет поменять на проде с https
+        secure=False,  # TODO: Set secure=True in production with HTTPS
     )
 
     return UserResponseSchema(access_token=access_token, user=UserSchema.model_validate(found_user))
@@ -115,7 +115,7 @@ def logout(
 ):
     if refresh_token is None:
         response.delete_cookie(key="refresh_token")
-        return {"message": "Успешный выход"}
+        return {"message": "Successfully logged out"}
 
     refresh_token_data = decode_token(refresh_token)
 
@@ -125,7 +125,7 @@ def logout(
 
     response.delete_cookie(key="refresh_token")
 
-    return {"message": "Успешный выход"}
+    return {"message": "Successfully logged out"}
 
 
 @router.post("/logout-all")
@@ -138,7 +138,7 @@ def logout_all(
 
     response.delete_cookie(key="refresh_token")
 
-    return {"message": "Успешный выход"}
+    return {"message": "Successfully logged out"}
 
 
 @router.post("/refresh")
@@ -148,7 +148,7 @@ def refresh(
     refresh_token: str | None = Cookie(None),
 ) -> TokenRefreshSchema:
     if refresh_token is None:
-        raise HTTPException(status_code=401, detail="Refresh-токен не найден в куках")
+        raise HTTPException(status_code=401, detail="Refresh token not found in cookies") from None
 
     refresh_token_data = decode_token(refresh_token)
 
@@ -179,7 +179,7 @@ def refresh(
         value=new_refresh_token,
         httponly=True,
         samesite="lax",
-        secure=False,  # Нужно будет поменять на проде с https
+        secure=False,  # TODO: Set secure=True in production with HTTPS
     )
 
     return TokenRefreshSchema(access_token=new_access_token)
@@ -194,7 +194,7 @@ async def send_verification_code(
         db.query(User.email).filter(User.id == token_data.sub).scalar()
     )
     if user_email is None:
-        raise HTTPException(status_code=404, detail="Пользователь не найден")
+        raise HTTPException(status_code=404, detail="User not found") from None
 
     random_code: str = str(random.randint(100000, 999999))
     expire_time = datetime.now(timezone.utc) + timedelta(minutes=15)
@@ -213,7 +213,7 @@ async def send_verification_code(
         db.add(db_verification)
 
     message = MessageSchema(
-        subject="Код подтверждения",
+        subject="Verification Code",
         body=random_code,
         recipients=[NameEmail(name="", email=user_email)],
         subtype=MessageType.plain,
@@ -222,12 +222,12 @@ async def send_verification_code(
     fm = FastMail(email_config)
     try:
         await fm.send_message(message)
-    except Exception as e:
+    except Exception:
         raise HTTPException(
-            status_code=500, detail="Письмо не удалось отправить, попробуйте позже"
-        ) from e
+            status_code=500, detail="Failed to send email, please try again later"
+        ) from None
 
-    return {"message": "Код успешно отправлен на вашу почту."}
+    return {"message": "Verification code sent to your email."}
 
 
 @router.post("/verify-email")
@@ -248,15 +248,15 @@ def verify_email(
     )
 
     if found_entry is None:
-        raise HTTPException(status_code=401, detail="Неверный код или срок действия истек.")
+        raise HTTPException(status_code=401, detail="Invalid code or code has expired") from None
 
     found_user = db.query(User).filter(User.id == token_data.sub).first()
 
     if found_user is None:
-        raise HTTPException(status_code=404, detail="Такой пользователь не найден")
+        raise HTTPException(status_code=404, detail="User not found") from None
 
     found_user.is_verified = True
 
     db.delete(found_entry)
 
-    return {"message": "Почта успешно подтверждена!"}
+    return {"message": "Email successfully verified!"}

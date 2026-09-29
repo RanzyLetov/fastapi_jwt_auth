@@ -14,7 +14,7 @@ class User(Base):
     id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid4()))
     username: Mapped[str] = mapped_column(String, unique=True, index=True, nullable=False)
     first_name: Mapped[str] = mapped_column(String, nullable=False)
-    role: Mapped[str] = mapped_column(String, default="user")  # Исправили rule на role
+    role: Mapped[str] = mapped_column(String, default="user")
     email: Mapped[str] = mapped_column(String, unique=True, index=True, nullable=False)
     is_verified: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
