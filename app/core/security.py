@@ -22,13 +22,13 @@ def verify_password(password: str, hashed_password: str) -> bool:
 
 
 def create_access_token(user_id: str, is_verified: bool) -> str:
-    time = datetime.now(timezone.utc)
+    now = datetime.now(timezone.utc)
 
     payload = AnyTokenDataSchema(
         sub=user_id,
         is_verified=is_verified,
-        exp=time + timedelta(minutes=15),
-        iat=time,
+        exp=now + timedelta(minutes=15),
+        iat=now,
         type="access",
         jti=str(uuid4()),
     ).model_dump()
@@ -37,12 +37,12 @@ def create_access_token(user_id: str, is_verified: bool) -> str:
 
 
 def create_refresh_token(user_id: str) -> str:
-    time = datetime.now(timezone.utc)
+    now = datetime.now(timezone.utc)
 
     payload = AnyTokenDataSchema(
         sub=user_id,
-        exp=time + timedelta(days=30),
-        iat=time,
+        exp=now + timedelta(days=30),
+        iat=now,
         type="refresh",
         jti=str(uuid4()),
     ).model_dump()
