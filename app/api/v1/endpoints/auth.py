@@ -39,14 +39,14 @@ def register(
     db: Annotated[Session, Depends(get_db)],
 ):
 
-    existing_email = (
+    existing_user = (
         db
         .query(User)
         .filter(or_(User.email == payload.email, User.username == payload.username))
         .first()
     )
 
-    if existing_email:
+    if existing_user:
         logger.warning("Attempted to register with existing email/username: %s", payload.email)
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
