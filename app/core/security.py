@@ -29,6 +29,7 @@ def create_access_token(user_id: str, is_verified: bool) -> str:
         exp=time + timedelta(minutes=15),
         iat=time,
         type="access",
+        jti=str(uuid4()),
     ).model_dump()
 
     return jwt.encode(payload, key=settings.SECRET_KEY, algorithm=settings.ALGORITHM)

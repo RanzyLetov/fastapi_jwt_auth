@@ -9,7 +9,7 @@ class AnyTokenDataSchema(BaseModel):
     iat: datetime
     type: str
     is_verified: bool = False
-    jti: str | None = None
+    jti: str
 
 
 class TokenRefreshSchema(BaseModel):
