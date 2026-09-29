@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session
 from app.api.v1.dependencies import get_token_from_header
 from app.core.config import email_config, settings
 from app.core.database import get_db
+from app.core.logger import logger
 from app.core.security import (
     create_access_token,
     create_refresh_token,
@@ -46,6 +47,7 @@ def register(
     )
 
     if existing_email:
+        logger.warning("Attempted to register with existing email/username: %s", payload.email)
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="Email or username already exists.",
@@ -63,8 +65,10 @@ def register(
     try:
         db.commit()
     except IntegrityError:
+        logger.warning("User already exists")
         raise HTTPException(status_code=409, detail="User already exists") from None
 
+    logger.info("User registered successfully: %s", db_user.id)
     return {"message": "Registration successful."}
 
 
@@ -79,9 +83,11 @@ def login(
 
     if found_user is None:
         verify_password(password=payload.password, hashed_password=settings.DEFAULT_HASHED_PASSWORD)
+        logger.warning("Invalid email or password: %s", payload.username)
         raise HTTPException(status_code=401, detail="Invalid email or password") from None
 
     if not verify_password(password=payload.password, hashed_password=found_user.hashed_password):
+        logger.warning("Invalid email or password: %s", payload.username)
         raise HTTPException(status_code=401, detail="Invalid email or password") from None
 
     access_token = create_access_token(found_user.id, found_user.is_verified)
@@ -104,6 +110,7 @@ def login(
         secure=False,  # TODO: Set secure=True in production with HTTPS
     )
 
+    logger.info("User logged in successfully: %s", found_user.id)
     return UserResponseSchema(access_token=access_token, user=UserSchema.model_validate(found_user))
 
 
@@ -125,6 +132,7 @@ def logout(
 
     response.delete_cookie(key="refresh_token")
 
+    logger.info("User logged out successfully: %s", refresh_token_data.sub)
     return {"message": "Successfully logged out"}
 
 
@@ -138,6 +146,7 @@ def logout_all(
 
     response.delete_cookie(key="refresh_token")
 
+    logger.info("User logged out successfully: %s", token_data.sub)
     return {"message": "Successfully logged out"}
 
 
@@ -148,6 +157,7 @@ def refresh(
     refresh_token: str | None = Cookie(None),
 ) -> TokenRefreshSchema:
     if refresh_token is None:
+        logger.warning("Refresh token not found in cookies")
         raise HTTPException(status_code=401, detail="Refresh token not found in cookies") from None
 
     refresh_token_data = decode_token(refresh_token)
@@ -159,6 +169,11 @@ def refresh(
     if found_token is None:
         db.query(Refresh).filter(Refresh.user_id == refresh_token_data.sub).delete(
             synchronize_session=False
+        )
+        logger.warning(
+            "Invalid or reused refresh token. User ID: %s, JTI: %s",
+            refresh_token_data.sub,
+            refresh_token_data.jti,
         )
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED)
 
@@ -182,6 +197,7 @@ def refresh(
         secure=False,  # TODO: Set secure=True in production with HTTPS
     )
 
+    logger.info("Token refreshed successfully: %s", refresh_token_data.sub)
     return TokenRefreshSchema(access_token=new_access_token)
 
 
@@ -194,6 +210,7 @@ async def send_verification_code(
         db.query(User.email).filter(User.id == token_data.sub).scalar()
     )
     if user_email is None:
+        logger.warning("User not found: %s", token_data.sub)
         raise HTTPException(status_code=404, detail="User not found") from None
 
     random_code: str = str(random.randint(100000, 999999))
@@ -222,11 +239,13 @@ async def send_verification_code(
     fm = FastMail(email_config)
     try:
         await fm.send_message(message)
-    except Exception:
+    except Exception as exc:
+        logger.error("Failed to send email for user_id: %s. Reason: %s", token_data.sub, str(exc))
         raise HTTPException(
             status_code=500, detail="Failed to send email, please try again later"
         ) from None
 
+    logger.info("Verification code sent for user_id: %s", token_data.sub)
     return {"message": "Verification code sent to your email."}
 
 
@@ -248,15 +267,18 @@ def verify_email(
     )
 
     if found_entry is None:
+        logger.warning("Invalid code or code has expired: %s", token_data.sub)
         raise HTTPException(status_code=401, detail="Invalid code or code has expired") from None
 
     found_user = db.query(User).filter(User.id == token_data.sub).first()
 
     if found_user is None:
+        logger.warning("User not found: %s", token_data.sub)
         raise HTTPException(status_code=404, detail="User not found") from None
 
     found_user.is_verified = True
 
     db.delete(found_entry)
 
+    logger.info("Email verified successfully: %s", token_data.sub)
     return {"message": "Email successfully verified!"}

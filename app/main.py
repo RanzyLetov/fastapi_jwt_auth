@@ -26,4 +26,4 @@ def hello_world():
 app.include_router(auth_router, prefix="/api")
 
 if __name__ == "__main__":
-    uvicorn.run("app.main:app", reload=True, port=8080)
+    uvicorn.run("app.main:app", reload=True, port=8080, log_level="critical")

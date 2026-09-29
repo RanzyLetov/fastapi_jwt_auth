@@ -6,6 +6,7 @@ import jwt
 from fastapi import HTTPException, status
 
 from app.core.config import settings
+from app.core.logger import logger
 from app.schemas.token import AnyTokenDataSchema
 
 
@@ -54,7 +55,8 @@ def decode_token(token: str) -> AnyTokenDataSchema:
         decoded_dict = jwt.decode(token, key=settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
         decoded_dict["exp"] = datetime.fromtimestamp(timestamp=decoded_dict["exp"], tz=timezone.utc)
         decoded_dict["iat"] = datetime.fromtimestamp(timestamp=decoded_dict["iat"], tz=timezone.utc)
-    except jwt.PyJWTError:
+    except jwt.PyJWTError as err:
+        logger.error("Token decoding failed: %s", err)
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED) from None
 
     return AnyTokenDataSchema(**decoded_dict)
