@@ -9,6 +9,7 @@ certifi==2026.7.22
 cffi==2.1.1
 click==8.5.0
 cryptography==50.0.1
+Deprecated==3.0.0
 detect-installer==0.2.1
 dnspython==2.8.0
 email-validator==2.3.0
@@ -23,9 +24,11 @@ httptools==0.8.0
 httpx==0.28.1
 idna==3.20
 Jinja2==3.1.6
+limits==5.8.0
 markdown-it-py==4.2.0
 MarkupSafe==3.0.3
 mdurl==0.1.2
+packaging==26.3
 psycopg2-binary==2.9.13
 pycparser==3.0
 pydantic==2.13.5
@@ -44,6 +47,7 @@ rignore==0.8.1
 ruff==0.16.8
 sentry-sdk==2.68.1
 shellingham==1.5.4
+slowapi==0.1.10
 SQLAlchemy==2.0.54
 starlette==1.6.0
 typer==0.27.2
@@ -54,3 +58,4 @@ uvicorn==0.52.4
 uvloop==0.22.1
 watchfiles==1.2.0
 websockets==17.1
+wrapt==2.5.0

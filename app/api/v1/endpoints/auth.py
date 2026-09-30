@@ -2,7 +2,7 @@ import random
 from datetime import datetime, timedelta, timezone
 from typing import Annotated
 
-from fastapi import APIRouter, Cookie, Depends, HTTPException, Response, status
+from fastapi import APIRouter, Cookie, Depends, HTTPException, Request, Response, status
 from fastapi.concurrency import run_in_threadpool
 from fastapi.security import OAuth2PasswordRequestForm
 from fastapi_mail import FastMail, MessageSchema, MessageType, NameEmail
@@ -14,6 +14,7 @@ from app.api.v1.dependencies import get_token_from_header
 from app.core.config import email_config, settings
 from app.core.database import get_db
 from app.core.logger import logger
+from app.core.rate_limiter import limiter
 from app.core.security import (
     create_access_token,
     create_refresh_token,
@@ -73,7 +74,9 @@ def register(
 
 
 @router.post("/login")
+@limiter.limit("5/minute")
 def login(
+    request: Request,
     response: Response,
     payload: Annotated[OAuth2PasswordRequestForm, Depends()],
     db: Annotated[Session, Depends(get_db)],
@@ -202,7 +205,9 @@ def refresh(
 
 
 @router.post("/resend-code")
+@limiter.limit("5/hour")
 async def send_verification_code(
+    request: Request,
     token_data: Annotated[AnyTokenDataSchema, Depends(get_token_from_header)],
     db: Annotated[Session, Depends(get_db)],
 ):
@@ -250,7 +255,9 @@ async def send_verification_code(
 
 
 @router.post("/verify-email")
+@limiter.limit("5/minute")
 def verify_email(
+    request: Request,
     payload: UserVerifySchema,
     token_data: Annotated[AnyTokenDataSchema, Depends(get_token_from_header)],
     db: Annotated[Session, Depends(get_db)],
