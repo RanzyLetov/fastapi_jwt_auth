@@ -121,9 +121,14 @@ async def send_verification_code(
     token_data: Annotated[AnyTokenDataSchema, Depends(get_token_from_header)],
     service: Annotated[AuthService, Depends(get_auth_service)],
 ):
-    await service.initiate_email_verification(user_id=token_data.sub)
+    try:
+        await service.initiate_email_verification(user_id=token_data.sub)
+        return {"message": "Verification code sent to your email."}
 
-    return {"message": "Verification code sent to your email."}
+    except RuntimeError:
+        raise HTTPException(
+            status_code=500, detail="Failed to send email, please try again later"
+        ) from None
 
 
 @router.post("/verify-email")

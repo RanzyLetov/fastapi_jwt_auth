@@ -3,12 +3,11 @@ from datetime import datetime, timedelta, timezone
 
 from fastapi import HTTPException, status
 from fastapi.concurrency import run_in_threadpool
-from fastapi_mail import FastMail, MessageSchema, MessageType, NameEmail
 from sqlalchemy import delete, or_
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm.session import Session
 
-from app.core.config import email_config, settings
+from app.core.config import settings
 from app.core.logger import logger
 from app.core.security import (
     create_access_token,
@@ -18,11 +17,13 @@ from app.core.security import (
     verify_password,
 )
 from app.models.user import Refresh, User, Verification
+from app.services.email_service import EmailService
 
 
 class AuthService:
-    def __init__(self, db: Session):
+    def __init__(self, db: Session, email_service: EmailService):
         self.db = db
+        self.email_service = email_service
 
     def create_user(
         self, username: str, first_name: str, email: str, password: str, password_confirm: str
@@ -188,21 +189,7 @@ class AuthService:
             )
             self.db.add(db_verification)
 
-        message = MessageSchema(
-            subject="Verification Code",
-            body=random_code,
-            recipients=[NameEmail(name="", email=user_email)],
-            subtype=MessageType.plain,
-        )
-
-        fm = FastMail(email_config)
-        try:
-            await fm.send_message(message)
-        except Exception as exc:
-            logger.error("Failed to send email for user_id: %s. Reason: %s", user_id, str(exc))
-            raise HTTPException(
-                status_code=500, detail="Failed to send email, please try again later"
-            ) from None
+        await self.email_service.send_verification_code(code=random_code, email=user_email)
 
         logger.info("Verification code sent for user_id: %s", user_id)
 

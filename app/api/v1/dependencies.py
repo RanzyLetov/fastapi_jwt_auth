@@ -10,6 +10,7 @@ from app.core.database import get_db
 from app.core.logger import logger
 from app.schemas.token import AnyTokenDataSchema
 from app.services.auth_services import AuthService
+from app.services.email_service import EmailService
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/auth/login")
 
@@ -26,5 +27,12 @@ def get_token_from_header(token: str = Depends(oauth2_scheme)) -> AnyTokenDataSc
     return AnyTokenDataSchema(**token_dict)
 
 
-def get_auth_service(db: Annotated[Session, Depends(get_db)]) -> AuthService:
-    return AuthService(db)
+def get_email_service() -> EmailService:
+    return EmailService()
+
+
+def get_auth_service(
+    db: Annotated[Session, Depends(get_db)],
+    email_service: Annotated[EmailService, Depends(get_email_service)],
+) -> AuthService:
+    return AuthService(db, email_service)
