@@ -1,8 +1,9 @@
-import random
+import secrets
 from datetime import datetime, timedelta, timezone
 
-from fastapi import HTTPException, status
+from fastapi import BackgroundTasks, HTTPException, status
 from fastapi.concurrency import run_in_threadpool
+from pydantic import EmailStr
 from sqlalchemy import delete, or_
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm.session import Session
@@ -13,10 +14,11 @@ from app.core.security import (
     create_access_token,
     create_refresh_token,
     decode_token,
+    hash_code,
     hash_password,
     verify_password,
 )
-from app.models.user import Refresh, User, Verification
+from app.models.user import PasswordReset, Refresh, User, Verification
 from app.services.email_service import EmailService
 
 
@@ -173,7 +175,8 @@ class AuthService:
             logger.warning("User not found: %s", user_id)
             raise HTTPException(status_code=404, detail="User not found") from None
 
-        random_code: str = str(random.randint(100000, 999999))
+        random_code = str(secrets.randbelow(900000) + 100000)
+        hashed_code = hash_code(random_code)
         expire_time = datetime.now(timezone.utc) + timedelta(minutes=15)
 
         found_verification = (
@@ -181,11 +184,11 @@ class AuthService:
         )
 
         if found_verification:
-            found_verification.code = random_code
+            found_verification.code = hashed_code
             found_verification.expires_at = expire_time
         else:
             db_verification = Verification(
-                user_id=user_id, code=random_code, expires_at=expire_time
+                user_id=user_id, code=hashed_code, expires_at=expire_time
             )
             self.db.add(db_verification)
 
@@ -203,7 +206,7 @@ class AuthService:
             .query(Verification)
             .filter(
                 Verification.user_id == user_id,
-                Verification.code == code,
+                Verification.code == hash_code(code),
                 Verification.expires_at > datetime.now(timezone.utc),
             )
             .first()
@@ -226,3 +229,26 @@ class AuthService:
         self.db.delete(found_entry)
 
         logger.info("Email verified successfully: %s", user_id)
+
+    def request_password_reset(self, email: EmailStr, background_tasks: BackgroundTasks):
+        found_user = self.db.query(User).filter(User.email == email).first()
+
+        if found_user is None:
+            logger.warning("User not found: %s", email)
+            return
+
+        self.db.query(PasswordReset).filter(PasswordReset.user_id == found_user.id).delete()
+
+        random_code = str(secrets.randbelow(900000) + 100000)
+        hashed_code = hash_code(random_code)
+
+        password_reset_db = PasswordReset(
+            user_id=found_user.id,
+            code=hashed_code,
+        )
+
+        background_tasks.add_task(self.email_service.send_reset_code, random_code, email)
+
+        self.db.add(password_reset_db)
+
+        logger.info("Reset code sent for user_id: %s", found_user.id)

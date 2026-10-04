@@ -58,3 +58,6 @@ class UserVerificationInDBSchema(BaseModel):
 
 class UserVerifySchema(BaseModel):
     code: str
+
+class ForgotPasswordSchema(BaseModel):
+    email: EmailStr

@@ -1,6 +1,15 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Cookie, Depends, HTTPException, Request, Response, status
+from fastapi import (
+    APIRouter,
+    BackgroundTasks,
+    Cookie,
+    Depends,
+    HTTPException,
+    Request,
+    Response,
+    status,
+)
 from fastapi.security import OAuth2PasswordRequestForm
 
 from app.api.v1.dependencies import get_auth_service, get_token_from_header
@@ -8,6 +17,7 @@ from app.core.logger import logger
 from app.core.rate_limiter import limiter
 from app.schemas.token import AnyTokenDataSchema, TokenRefreshSchema
 from app.schemas.user import (
+    ForgotPasswordSchema,
     UserRegisterSchema,
     UserResponseSchema,
     UserSchema,
@@ -120,9 +130,11 @@ async def send_verification_code(
     request: Request,
     token_data: Annotated[AnyTokenDataSchema, Depends(get_token_from_header)],
     service: Annotated[AuthService, Depends(get_auth_service)],
+    background_tasks: BackgroundTasks,
 ):
     try:
-        await service.initiate_email_verification(user_id=token_data.sub)
+        # await service.initiate_email_verification(user_id=token_data.sub)
+        background_tasks.add_task(service.initiate_email_verification, token_data.sub)
         return {"message": "Verification code sent to your email."}
 
     except RuntimeError:
@@ -140,5 +152,18 @@ def verify_email(
     service: Annotated[AuthService, Depends(get_auth_service)],
 ):
     service.confirm_email(code=payload.code, user_id=token_data.sub)
-
     return {"message": "Email successfully verified!"}
+
+
+@router.post("/forgot-password")
+@limiter.limit("3/hour")
+async def forgot_password(
+    request: Request,
+    payload: ForgotPasswordSchema,
+    service: Annotated[AuthService, Depends(get_auth_service)],
+    background_tasks: BackgroundTasks,
+):
+
+    service.request_password_reset(payload.email, background_tasks)
+
+    return {"message": "If the email is registered, a password reset code has been sent."}

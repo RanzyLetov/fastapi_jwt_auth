@@ -1,3 +1,4 @@
+import hashlib
 from datetime import datetime, timedelta, timezone
 from uuid import uuid4
 
@@ -60,3 +61,7 @@ def decode_token(token: str) -> AnyTokenDataSchema:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED) from None
 
     return AnyTokenDataSchema(**decoded_dict)
+
+
+def hash_code(code: str):
+    return hashlib.sha256(code.encode("utf-8")).hexdigest()
