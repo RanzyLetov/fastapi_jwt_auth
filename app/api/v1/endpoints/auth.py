@@ -18,6 +18,7 @@ from app.core.rate_limiter import limiter
 from app.schemas.token import AnyTokenDataSchema, TokenRefreshSchema
 from app.schemas.user import (
     ForgotPasswordSchema,
+    ResetPasswordSchema,
     UserRegisterSchema,
     UserResponseSchema,
     UserSchema,
@@ -167,3 +168,18 @@ async def forgot_password(
     service.request_password_reset(payload.email, background_tasks)
 
     return {"message": "If the email is registered, a password reset code has been sent."}
+
+
+@router.post("/reset-password")
+@limiter.limit("5/minute")
+def reset_password(
+    request: Request,
+    payload: ResetPasswordSchema,
+    service: Annotated[AuthService, Depends(get_auth_service)],
+):
+    service.complete_password_reset(
+        code=payload.code,
+        email=payload.email,
+        new_password=payload.new_password,
+    )
+    return {"message": "Password has been successfully reset."}

@@ -61,3 +61,15 @@ class UserVerifySchema(BaseModel):
 
 class ForgotPasswordSchema(BaseModel):
     email: EmailStr
+
+class ResetPasswordSchema(BaseModel):
+    code: str
+    email: EmailStr
+    new_password: str
+    new_password_confirm: str
+
+    @model_validator(mode="after")
+    def check_new_passwords_match(self) -> Self:
+        if self.new_password != self.new_password_confirm:
+            raise ValueError("New passwords do not match")
+        return self

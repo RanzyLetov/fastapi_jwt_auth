@@ -252,3 +252,43 @@ class AuthService:
         self.db.add(password_reset_db)
 
         logger.info("Reset code sent for user_id: %s", found_user.id)
+
+    def complete_password_reset(
+        self,
+        email: EmailStr,
+        code: str,
+        new_password: str,
+    ):
+        found_user = self.db.query(User).filter(User.email == email).first()
+        if found_user is None:
+            logger.warning("Password reset failed: user not found for email %s", email)
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid or expired reset code",
+            )
+
+        found_reset = (
+            self.db
+            .query(PasswordReset)
+            .filter(
+                PasswordReset.user_id == found_user.id,
+                PasswordReset.code == hash_code(code),
+                PasswordReset.expires_at > datetime.now(timezone.utc),
+            )
+            .first()
+        )
+        if found_reset is None:
+            logger.warning(
+                "Password reset failed: invalid or expired code for user_id %s", found_user.id
+            )
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid or expired reset code",
+            )
+            
+
+        found_user.hashed_password = hash_password(new_password)
+        self.db.delete(found_reset)
+        self.revoke_all_user_tokens(found_user.id)
+
+        logger.info("Password successfully reset for user_id: %s", found_user.id)
