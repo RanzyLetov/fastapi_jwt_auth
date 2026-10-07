@@ -18,6 +18,7 @@ from app.core.rate_limiter import limiter
 from app.schemas.token import AnyTokenData, TokenRefresh
 from app.schemas.user import (
     ForgotPassword,
+    MessageResponse,
     ResetPassword,
     User,
     UserRegister,
@@ -39,7 +40,9 @@ def register(payload: UserRegister, service: Annotated[AuthService, Depends(get_
             password=payload.password,
             password_confirm=payload.password_confirm,
         )
-        return {"message": "Registration successful."}
+
+        return MessageResponse(message="Registration successful.")
+
     except ValueError as err:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(err)) from err
 
@@ -83,7 +86,8 @@ def logout(
         service.revoke_refresh_token(refresh_token=refresh_token)
 
     response.delete_cookie(key="refresh_token")
-    return {"message": "Successfully logged out"}
+
+    return MessageResponse(message="Successfully logged out.")
 
 
 @router.post("/logout-all")
@@ -95,7 +99,8 @@ def logout_all(
     service.revoke_all_user_tokens(user_id=token_data.sub)
 
     response.delete_cookie(key="refresh_token")
-    return {"message": "Successfully logged out"}
+
+    return MessageResponse(message="Successfully logged out.")
 
 
 @router.post("/refresh")
@@ -134,7 +139,7 @@ async def send_verification_code(
     try:
         # await service.initiate_email_verification(user_id=token_data.sub)
         background_tasks.add_task(service.initiate_email_verification, token_data.sub)
-        return {"message": "Verification code sent to your email."}
+        return MessageResponse(message="Verification code sent to your email.")
 
     except RuntimeError:
         raise HTTPException(
@@ -151,7 +156,8 @@ def verify_email(
     service: Annotated[AuthService, Depends(get_auth_service)],
 ):
     service.confirm_email(code=payload.code, user_id=token_data.sub)
-    return {"message": "Email successfully verified!"}
+
+    return MessageResponse(message="Email successfully verified.")
 
 
 @router.post("/forgot-password")
@@ -165,7 +171,9 @@ async def forgot_password(
 
     service.request_password_reset(payload.email, background_tasks)
 
-    return {"message": "If the email is registered, a password reset code has been sent."}
+    return MessageResponse(
+        message="If the email is registered, a password reset code has been sent."
+    )
 
 
 @router.post("/reset-password")
@@ -180,4 +188,5 @@ def reset_password(
         email=payload.email,
         new_password=payload.new_password,
     )
-    return {"message": "Password has been successfully reset."}
+
+    return MessageResponse(message="Password has been successfully reset.")
