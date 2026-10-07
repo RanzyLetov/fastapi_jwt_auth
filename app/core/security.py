@@ -8,7 +8,7 @@ from fastapi import HTTPException, status
 
 from app.core.config import settings
 from app.core.logger import logger
-from app.schemas.token import AnyTokenDataSchema
+from app.schemas.token import AnyTokenData
 
 
 def hash_password(password: str) -> str:
@@ -25,7 +25,7 @@ def verify_password(password: str, hashed_password: str) -> bool:
 def create_access_token(user_id: str, is_verified: bool) -> str:
     now = datetime.now(timezone.utc)
 
-    payload = AnyTokenDataSchema(
+    payload = AnyTokenData(
         sub=user_id,
         is_verified=is_verified,
         exp=now + timedelta(minutes=15),
@@ -40,7 +40,7 @@ def create_access_token(user_id: str, is_verified: bool) -> str:
 def create_refresh_token(user_id: str) -> str:
     now = datetime.now(timezone.utc)
 
-    payload = AnyTokenDataSchema(
+    payload = AnyTokenData(
         sub=user_id,
         exp=now + timedelta(days=30),
         iat=now,
@@ -51,7 +51,7 @@ def create_refresh_token(user_id: str) -> str:
     return jwt.encode(payload, key=settings.SECRET_KEY, algorithm=settings.ALGORITHM)
 
 
-def decode_token(token: str) -> AnyTokenDataSchema:
+def decode_token(token: str) -> AnyTokenData:
     try:
         decoded_dict = jwt.decode(token, key=settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
         decoded_dict["exp"] = datetime.fromtimestamp(timestamp=decoded_dict["exp"], tz=timezone.utc)
@@ -60,7 +60,7 @@ def decode_token(token: str) -> AnyTokenDataSchema:
         logger.error("Token decoding failed: %s", err)
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED) from None
 
-    return AnyTokenDataSchema(**decoded_dict)
+    return AnyTokenData(**decoded_dict)
 
 
 def hash_code(code: str):

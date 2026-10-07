@@ -5,7 +5,7 @@ from uuid import uuid4
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, model_validator
 
 
-class UserSchema(BaseModel):
+class User(BaseModel):
     username: str
     first_name: str
     email: EmailStr
@@ -18,11 +18,11 @@ class UserSchema(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
-class UserInDBSchema(UserSchema):
+class UserInDB(User):
     hashed_password: str
 
 
-class UserRegisterSchema(BaseModel):
+class UserRegister(BaseModel):
     username: str
     first_name: str
     email: EmailStr
@@ -36,9 +36,9 @@ class UserRegisterSchema(BaseModel):
         return self
 
 
-class UserResponseSchema(BaseModel):
+class UserResponse(BaseModel):
     access_token: str
-    user: UserSchema
+    user: User
 
 
 class UserRefreshInDBSchema(BaseModel):
@@ -48,7 +48,7 @@ class UserRefreshInDBSchema(BaseModel):
     jti: str = Field(default_factory=lambda: str(uuid4()))
 
 
-class UserVerificationInDBSchema(BaseModel):
+class UserVerificationInDB(BaseModel):
     user_id: str
     code: str
     expires_at: datetime = Field(
@@ -56,13 +56,13 @@ class UserVerificationInDBSchema(BaseModel):
     )
 
 
-class UserVerifySchema(BaseModel):
+class UserVerify(BaseModel):
     code: str
 
-class ForgotPasswordSchema(BaseModel):
+class ForgotPassword(BaseModel):
     email: EmailStr
 
-class ResetPasswordSchema(BaseModel):
+class ResetPassword(BaseModel):
     code: str
     email: EmailStr
     new_password: str

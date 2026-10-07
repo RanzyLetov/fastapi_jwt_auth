@@ -3,7 +3,7 @@ from datetime import datetime
 from pydantic import BaseModel
 
 
-class AnyTokenDataSchema(BaseModel):
+class AnyTokenData(BaseModel):
     sub: str
     exp: datetime
     iat: datetime
@@ -12,5 +12,5 @@ class AnyTokenDataSchema(BaseModel):
     jti: str
 
 
-class TokenRefreshSchema(BaseModel):
+class TokenRefresh(BaseModel):
     access_token: str

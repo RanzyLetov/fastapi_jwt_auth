@@ -8,14 +8,14 @@ from sqlalchemy.orm import Session
 from app.core.config import settings
 from app.core.database import get_db
 from app.core.logger import logger
-from app.schemas.token import AnyTokenDataSchema
+from app.schemas.token import AnyTokenData
 from app.services.auth_services import AuthService
 from app.services.email_service import EmailService
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/auth/login")
 
 
-def get_token_from_header(token: str = Depends(oauth2_scheme)) -> AnyTokenDataSchema:
+def get_token_from_header(token: str = Depends(oauth2_scheme)) -> AnyTokenData:
     try:
         token_dict = jwt.decode(token, key=settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
     except jwt.PyJWTError as err:
@@ -24,7 +24,7 @@ def get_token_from_header(token: str = Depends(oauth2_scheme)) -> AnyTokenDataSc
             status_code=status.HTTP_401_UNAUTHORIZED, detail="Could not validate credentials"
         ) from err
 
-    return AnyTokenDataSchema(**token_dict)
+    return AnyTokenData(**token_dict)
 
 
 def get_email_service() -> EmailService:
