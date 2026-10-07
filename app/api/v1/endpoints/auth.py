@@ -137,7 +137,6 @@ async def send_verification_code(
     background_tasks: BackgroundTasks,
 ):
     try:
-        # await service.initiate_email_verification(user_id=token_data.sub)
         background_tasks.add_task(service.initiate_email_verification, token_data.sub)
         return MessageResponse(message="Verification code sent to your email.")
 
