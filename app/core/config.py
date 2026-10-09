@@ -16,6 +16,8 @@ class Settings(BaseSettings):
 
     CORS_ORIGINS: Any = ["http://localhost:3000"]
 
+    FRONTEND_URL: str = "http://localhost:3000"
+
     SMTP_HOST: str = Field(default=...)
     SMTP_PORT: int = Field(default=...)
     SMTP_USER: EmailStr = Field(default=...)

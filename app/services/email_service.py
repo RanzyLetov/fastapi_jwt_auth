@@ -24,10 +24,10 @@ class EmailService:
             logger.error("Failed to send verification email to %s", email, exc_info=True)
             raise EmailDeliveryError("Failed to send email") from exc
 
-    async def send_reset_code(self, code: str, email: EmailStr):
+    async def send_reset_code(self, link: str, email: EmailStr):
         message = MessageSchema(
-            subject="Reset Code",
-            body=code,
+            subject="Reset link",
+            body=link,
             recipients=[NameEmail(name="", email=email)],
             subtype=MessageType.plain,
         )

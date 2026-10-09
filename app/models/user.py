@@ -46,7 +46,7 @@ class Verification(Base):
 class PasswordReset(Base):
     __tablename__ = "password_reset"
     user_id: Mapped[str] = mapped_column(String, primary_key=True)
-    code: Mapped[str] = mapped_column(String, nullable=False)
+    token: Mapped[str] = mapped_column(String, nullable=False)
     expires_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc) + timedelta(minutes=15)
     )

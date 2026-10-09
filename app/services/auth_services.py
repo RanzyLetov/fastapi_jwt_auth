@@ -14,8 +14,8 @@ from app.core.security import (
     create_access_token,
     create_refresh_token,
     decode_token,
-    hash_code,
     hash_password,
+    hash_token,
     verify_password,
 )
 from app.models.user import PasswordReset, Refresh, User, Verification
@@ -176,7 +176,7 @@ class AuthService:
             raise HTTPException(status_code=404, detail="User not found") from None
 
         random_code = str(secrets.randbelow(900000) + 100000)
-        hashed_code = hash_code(random_code)
+        hashed_code = hash_token(random_code)
         expire_time = datetime.now(timezone.utc) + timedelta(minutes=15)
 
         found_verification = (
@@ -206,7 +206,7 @@ class AuthService:
             .query(Verification)
             .filter(
                 Verification.user_id == user_id,
-                Verification.code == hash_code(code),
+                Verification.code == hash_token(code),
                 Verification.expires_at > datetime.now(timezone.utc),
             )
             .first()
@@ -239,15 +239,17 @@ class AuthService:
 
         self.db.query(PasswordReset).filter(PasswordReset.user_id == found_user.id).delete()
 
-        random_code = str(secrets.randbelow(900000) + 100000)
-        hashed_code = hash_code(random_code)
+        reset_token = str(secrets.token_urlsafe(32))
+        hashed_token = hash_token(reset_token)
+
+        reset_link = f"{settings.FRONTEND_URL}/reset-password?token={reset_token}&email={email}"
 
         password_reset_db = PasswordReset(
             user_id=found_user.id,
-            code=hashed_code,
+            token=hashed_token,
         )
 
-        background_tasks.add_task(self.email_service.send_reset_code, random_code, email)
+        background_tasks.add_task(self.email_service.send_reset_code, reset_link, email)
 
         self.db.add(password_reset_db)
 
@@ -256,7 +258,7 @@ class AuthService:
     def complete_password_reset(
         self,
         email: EmailStr,
-        code: str,
+        token: str,
         new_password: str,
     ):
         found_user = self.db.query(User).filter(User.email == email).first()
@@ -264,7 +266,7 @@ class AuthService:
             logger.warning("Password reset failed: user not found for email %s", email)
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Invalid or expired reset code",
+                detail="Invalid or expired reset token",
             )
 
         found_reset = (
@@ -272,7 +274,7 @@ class AuthService:
             .query(PasswordReset)
             .filter(
                 PasswordReset.user_id == found_user.id,
-                PasswordReset.code == hash_code(code),
+                PasswordReset.token == hash_token(token),
                 PasswordReset.expires_at > datetime.now(timezone.utc),
             )
             .first()
@@ -283,9 +285,8 @@ class AuthService:
             )
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Invalid or expired reset code",
+                detail="Invalid or expired reset token",
             )
-            
 
         found_user.hashed_password = hash_password(new_password)
         self.db.delete(found_reset)

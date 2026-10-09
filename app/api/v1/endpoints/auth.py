@@ -183,7 +183,7 @@ def reset_password(
     service: Annotated[AuthService, Depends(get_auth_service)],
 ):
     service.complete_password_reset(
-        code=payload.code,
+        token=payload.token,
         email=payload.email,
         new_password=payload.new_password,
     )

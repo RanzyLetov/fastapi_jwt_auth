@@ -63,7 +63,7 @@ class ForgotPassword(BaseModel):
     email: EmailStr
 
 class ResetPassword(BaseModel):
-    code: str
+    token: str
     email: EmailStr
     new_password: str
     new_password_confirm: str

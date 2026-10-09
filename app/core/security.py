@@ -63,5 +63,5 @@ def decode_token(token: str) -> AnyTokenData:
     return AnyTokenData(**decoded_dict)
 
 
-def hash_code(code: str):
-    return hashlib.sha256(code.encode("utf-8")).hexdigest()
+def hash_token(string: str):
+    return hashlib.sha256(string.encode("utf-8")).hexdigest()
