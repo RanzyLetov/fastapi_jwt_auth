@@ -1,12 +1,12 @@
 import uvicorn
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from slowapi.errors import RateLimitExceeded
 
 from app.api.v1.endpoints.auth import router as auth_router
 from app.core.config import settings
 from app.core.database import Base, engine
-from app.core.rate_limiter import _rate_limit_exceeded_handler, limiter
+from app.core.handlers import register_exception_handlers
+from app.core.rate_limiter import limiter
 
 Base.metadata.create_all(bind=engine)
 
@@ -20,7 +20,8 @@ app.add_middleware(
 )
 
 app.state.limiter = limiter
-app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+register_exception_handlers(app)
 
 
 @app.get("/")

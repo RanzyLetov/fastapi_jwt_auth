@@ -74,5 +74,16 @@ class ResetPassword(BaseModel):
             raise ValueError("New passwords do not match")
         return self
 
+class ChangePassword(BaseModel):
+    old_password: str
+    new_password: str
+    new_password_confirm: str
+
+    @model_validator(mode="after")
+    def check_new_passwords_match(self) -> Self:
+        if self.new_password != self.new_password_confirm:
+            raise ValueError("New passwords do not match")
+        return self
+
 class MessageResponse(BaseModel):
     message: str

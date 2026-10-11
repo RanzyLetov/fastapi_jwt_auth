@@ -9,6 +9,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm.session import Session
 
 from app.core.config import settings
+from app.core.exceptions import UserNotFoundError
 from app.core.logger import logger
 from app.core.security import (
     create_access_token,
@@ -293,3 +294,30 @@ class AuthService:
         self.revoke_all_user_tokens(found_user.id)
 
         logger.info("Password successfully reset for user_id: %s", found_user.id)
+
+    def change_password(
+        self,
+        user_id: str,
+        old_password: str,
+        new_password: str,
+    ):
+        found_user = self.db.query(User).filter(User.id == user_id).first()
+        if found_user is None:
+            logger.warning("Password change failed: user_id %s not found", user_id)
+            raise UserNotFoundError(user_id)
+
+
+
+        if not verify_password(old_password, found_user.hashed_password):
+            logger.warning("Password change rejected: invalid old password for user_id: %s", user_id)
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid old password",
+            )
+
+            
+        found_user.hashed_password = hash_password(new_password)
+
+        self.revoke_all_user_tokens(user_id)
+        logger.info("Password successfully changed for user_id: %s", user_id)
+

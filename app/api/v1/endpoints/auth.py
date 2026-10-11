@@ -17,6 +17,7 @@ from app.core.logger import logger
 from app.core.rate_limiter import limiter
 from app.schemas.token import AnyTokenData, TokenRefresh
 from app.schemas.user import (
+    ChangePassword,
     ForgotPassword,
     MessageResponse,
     ResetPassword,
@@ -189,3 +190,20 @@ def reset_password(
     )
 
     return MessageResponse(message="Password has been successfully reset.")
+
+
+@router.post("/change-password")
+@limiter.limit("3/hour")
+def change_password(
+    request: Request,
+    payload: ChangePassword,
+    token_data: Annotated[AnyTokenData, Depends(get_token_from_header)],
+    service: Annotated[AuthService, Depends(get_auth_service)],
+):
+    service.change_password(
+        user_id=token_data.sub,
+        old_password=payload.old_password,
+        new_password=payload.new_password,
+    )
+
+    return MessageResponse(message="Password has been successfully changed.")
