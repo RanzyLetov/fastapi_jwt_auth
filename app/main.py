@@ -4,11 +4,8 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.v1.endpoints.auth import router as auth_router
 from app.core.config import settings
-from app.core.database import Base, engine
 from app.core.handlers import register_exception_handlers
 from app.core.rate_limiter import limiter
-
-Base.metadata.create_all(bind=engine)
 
 app = FastAPI()
 
