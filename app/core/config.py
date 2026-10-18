@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, ClassVar
 
 from fastapi_mail import ConnectionConfig
 from pydantic import EmailStr, Field, SecretStr, field_validator
@@ -23,7 +23,7 @@ class Settings(BaseSettings):
     SMTP_USER: EmailStr = Field(default=...)
     SMTP_PASSWORD: SecretStr = Field(default=...)
 
-    ROLE_HIERARCHY = {
+    ROLE_HIERARCHY: ClassVar[dict[str, int]] = {
         "user": 1,
         "moderator": 2,
         "admin": 3,

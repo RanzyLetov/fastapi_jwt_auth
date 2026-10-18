@@ -1,5 +1,6 @@
 import secrets
 from datetime import datetime, timedelta, timezone
+from uuid import UUID
 
 from fastapi import BackgroundTasks, HTTPException, status
 from fastapi.concurrency import run_in_threadpool
@@ -121,7 +122,7 @@ class AuthService:
 
     def revoke_all_user_tokens(
         self,
-        user_id: str,
+        user_id: UUID,
     ):
         self.db.query(Refresh).filter(Refresh.user_id == user_id).delete(synchronize_session=False)
 
@@ -177,7 +178,7 @@ class AuthService:
 
     async def initiate_email_verification(
         self,
-        user_id: str,
+        user_id: UUID,
     ):
         user_email = await run_in_threadpool(
             self.db.query(User.email).filter(User.id == user_id).scalar()
@@ -210,7 +211,7 @@ class AuthService:
     def confirm_email(
         self,
         code: str,
-        user_id: str,
+        user_id: UUID,
     ):
         found_entry = (
             self.db
@@ -307,7 +308,7 @@ class AuthService:
 
     def change_password(
         self,
-        user_id: str,
+        user_id: UUID,
         old_password: str,
         new_password: str,
     ):

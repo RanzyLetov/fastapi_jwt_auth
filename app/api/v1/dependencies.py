@@ -42,6 +42,12 @@ def require_role(min_role: str):
     def role_checker(
         user_token: Annotated[TokenData, Depends(get_token_from_header)],
     ) -> TokenData:
+
+        if user_token.role is None:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN, detail="Not enough permissions"
+            )
+
         user_level = settings.ROLE_HIERARCHY.get(user_token.role, 0)
         required_level = settings.ROLE_HIERARCHY.get(min_role, 0)
 

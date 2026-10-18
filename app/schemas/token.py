@@ -1,10 +1,11 @@
 from datetime import datetime
 
 from pydantic import BaseModel
+from uuid import UUID
 
 
 class TokenData(BaseModel):
-    sub: str
+    sub: UUID
     exp: datetime
     iat: datetime
     type: str
@@ -14,7 +15,7 @@ class TokenData(BaseModel):
 
 
 class AccessTokenData(BaseModel):
-    sub: str
+    sub: UUID
     exp: datetime
     iat: datetime
     type: str
@@ -24,7 +25,7 @@ class AccessTokenData(BaseModel):
 
 
 class RefreshTokenData(BaseModel):
-    sub: str
+    sub: UUID
     exp: datetime
     iat: datetime
     type: str

@@ -1,6 +1,6 @@
 import hashlib
 from datetime import datetime, timedelta, timezone
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import bcrypt
 import jwt
@@ -22,7 +22,7 @@ def verify_password(password: str, hashed_password: str) -> bool:
     )
 
 
-def create_access_token(user_id: str, role: str, is_verified: bool) -> str:
+def create_access_token(user_id: UUID, role: str, is_verified: bool) -> str:
     now = datetime.now(timezone.utc)
 
     payload = AccessTokenData(
@@ -38,7 +38,7 @@ def create_access_token(user_id: str, role: str, is_verified: bool) -> str:
     return jwt.encode(payload, key=settings.SECRET_KEY, algorithm=settings.ALGORITHM)
 
 
-def create_refresh_token(user_id: str) -> str:
+def create_refresh_token(user_id: UUID) -> str:
     now = datetime.now(timezone.utc)
 
     payload = RefreshTokenData(
