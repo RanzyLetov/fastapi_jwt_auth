@@ -49,6 +49,7 @@ class AuthService:
             username=username,
             first_name=first_name,
             email=email,
+            role="user",
             hashed_password=hash_password(password),
         )
 
@@ -83,7 +84,7 @@ class AuthService:
             logger.warning("Invalid email or password: %s", username)
             raise HTTPException(status_code=401, detail="Invalid email or password") from None
 
-        access_token = create_access_token(found_user.id, found_user.is_verified)
+        access_token = create_access_token(found_user.id, found_user.role, found_user.is_verified)
         refresh_token = create_refresh_token(found_user.id)
         refresh_token_data = decode_token(refresh_token)
 
@@ -147,7 +148,16 @@ class AuthService:
             )
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED)
 
-        new_access_token = create_access_token(found_token.user_id, refresh_token_data.is_verified)
+        found_user = self.db.query(User).filter(User.id == found_token.user_id).first()
+
+        if found_user is None:
+            logger.warning("User not found: %s", found_token.user_id)
+            raise HTTPException(status_code=401, detail="User not found.") from None
+
+        new_access_token = create_access_token(
+            found_user.id, found_user.role, found_user.is_verified
+        )
+
         new_refresh_token = create_refresh_token(found_token.user_id)
         new_refresh_token_data = decode_token(new_refresh_token)
 
@@ -306,18 +316,16 @@ class AuthService:
             logger.warning("Password change failed: user_id %s not found", user_id)
             raise UserNotFoundError(user_id)
 
-
-
         if not verify_password(old_password, found_user.hashed_password):
-            logger.warning("Password change rejected: invalid old password for user_id: %s", user_id)
+            logger.warning(
+                "Password change rejected: invalid old password for user_id: %s", user_id
+            )
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Invalid old password",
             )
 
-            
         found_user.hashed_password = hash_password(new_password)
 
         self.revoke_all_user_tokens(user_id)
         logger.info("Password successfully changed for user_id: %s", user_id)
-

@@ -23,6 +23,12 @@ class Settings(BaseSettings):
     SMTP_USER: EmailStr = Field(default=...)
     SMTP_PASSWORD: SecretStr = Field(default=...)
 
+    ROLE_HIERARCHY = {
+        "user": 1,
+        "moderator": 2,
+        "admin": 3,
+    }
+
     @field_validator("CORS_ORIGINS", mode="before")
     @classmethod
     def split_cors_origins(cls, value: str | list[str]) -> list[str]:

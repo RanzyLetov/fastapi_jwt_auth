@@ -15,7 +15,7 @@ from fastapi.security import OAuth2PasswordRequestForm
 from app.api.v1.dependencies import get_auth_service, get_token_from_header
 from app.core.logger import logger
 from app.core.rate_limiter import limiter
-from app.schemas.token import AnyTokenData, TokenRefresh
+from app.schemas.token import TokenData, TokenRefresh
 from app.schemas.user import (
     ChangePassword,
     ForgotPassword,
@@ -94,7 +94,7 @@ def logout(
 @router.post("/logout-all")
 def logout_all(
     response: Response,
-    token_data: Annotated[AnyTokenData, Depends(get_token_from_header)],
+    token_data: Annotated[TokenData, Depends(get_token_from_header)],
     service: Annotated[AuthService, Depends(get_auth_service)],
 ):
     service.revoke_all_user_tokens(user_id=token_data.sub)
@@ -133,7 +133,7 @@ def refresh(
 @limiter.limit("5/hour")
 async def send_verification_code(
     request: Request,
-    token_data: Annotated[AnyTokenData, Depends(get_token_from_header)],
+    token_data: Annotated[TokenData, Depends(get_token_from_header)],
     service: Annotated[AuthService, Depends(get_auth_service)],
     background_tasks: BackgroundTasks,
 ):
@@ -152,7 +152,7 @@ async def send_verification_code(
 def verify_email(
     request: Request,
     payload: UserVerify,
-    token_data: Annotated[AnyTokenData, Depends(get_token_from_header)],
+    token_data: Annotated[TokenData, Depends(get_token_from_header)],
     service: Annotated[AuthService, Depends(get_auth_service)],
 ):
     service.confirm_email(code=payload.code, user_id=token_data.sub)
@@ -197,7 +197,7 @@ def reset_password(
 def change_password(
     request: Request,
     payload: ChangePassword,
-    token_data: Annotated[AnyTokenData, Depends(get_token_from_header)],
+    token_data: Annotated[TokenData, Depends(get_token_from_header)],
     service: Annotated[AuthService, Depends(get_auth_service)],
 ):
     service.change_password(
